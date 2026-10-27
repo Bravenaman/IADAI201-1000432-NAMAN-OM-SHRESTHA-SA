@@ -984,14 +984,15 @@ def cue_audio(cue: str) -> bytes:
     return _wav(samples)
 
 
-def _play_cue(cue: str, token: tuple) -> None:
-    """Start the cue on its own when the result lands on a band. No play control."""
-    if st.session_state.get("cue_token") == token:
-        return
-    st.session_state.cue_token = token
+def _play_cue(cue: str) -> None:
+    """Start the cue for this result, including a repeat of the same scenario."""
+    st.session_state.cue_play = st.session_state.get("cue_play", 0) + 1
     encoded = base64.b64encode(cue_audio(cue)).decode("ascii")
+    # A new id each time forces the browser to start the clip again.
+    # The same alarm file would otherwise stay silent on the next full lot.
     st.markdown(
-        f'<audio autoplay playsinline src="data:audio/wav;base64,{encoded}"></audio>',
+        f'<audio autoplay playsinline id="parkvision-cue-{st.session_state.cue_play}" '
+        f'src="data:audio/wav;base64,{encoded}"></audio>',
         unsafe_allow_html=True,
     )
 
@@ -1086,16 +1087,6 @@ def main() -> None:
         else:
             st.info("No sample frames are stored in samples/.")
 
-        st.header("Bays")
-        occupied_below = st.slider(
-            "Match sensitivity",
-            min_value=0.35,
-            max_value=0.75,
-            value=OCCUPIED_BELOW,
-            step=0.05,
-            help="Used when the photo matches the sample camera. Higher values mark a bay occupied on a weaker mismatch with the empty plate.",
-        )
-
         with st.expander("How a recommendation is made"):
             st.markdown(
                 """
@@ -1112,7 +1103,8 @@ def main() -> None:
                 The average number of open bays is taken across the saved frames.
                 Twice that average is free and plays a short chime. Half of it
                 is full and plays a 3 second alarm. Anywhere between is busy
-                and plays a warning. The sound starts on its own.
+                and plays a warning. The sound starts on its own, including
+                when the next lot falls in the same band.
 
                 On the sample camera, the row under the grass and the row at the
                 bottom edge are both included. The aisle between them is not a bay.
@@ -1141,7 +1133,7 @@ def main() -> None:
 
     plate = reference()
     bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-    reading = read_lot(bgr, plate, occupied_below=occupied_below)
+    reading = read_lot(bgr, plate)
     if not reading.slots:
         with st.spinner("Finding bays in this overhead shot..."):
             reading = read_overhead(bgr)
@@ -1192,11 +1184,7 @@ def main() -> None:
     )
     cue = cue_for(insights.level)
     if cue is not None:
-        if upload is not None:
-            identity = ("upload", upload.name, getattr(upload, "size", 0))
-        else:
-            identity = ("sample", str(sample_path))
-        _play_cue(cue, (identity, insights.level, insights.available))
+        _play_cue(cue)
 
     if reading.same_camera:
         st.caption(
