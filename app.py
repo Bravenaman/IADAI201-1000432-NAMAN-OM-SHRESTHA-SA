@@ -2049,16 +2049,72 @@ _PAGE_CSS = """
 """
 
 
+# The mark painted in the header. Used when assets/logo.png is not next to
+# the app, which is what a Streamlit Cloud deploy does if that folder is absent.
+_LOGO_PNG = (
+    "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"
+)
+
+
+def _logo_bytes() -> bytes:
+    """The header mark, from disk when the file is deployed and otherwise from the app."""
+    path = ROOT / "assets" / "logo.png"
+    if path.is_file():
+        return path.read_bytes()
+    return base64.b64decode(_LOGO_PNG)
+
+
 def main() -> None:
+    logo = _logo_bytes()
+    icon_path = ROOT / "assets" / "logo.png"
     st.set_page_config(
         page_title="ParkVision AI",
-        page_icon=str(ROOT / "assets" / "logo.png"),
+        page_icon=str(icon_path) if icon_path.is_file() else Image.open(io.BytesIO(logo)),
         layout="wide",
         initial_sidebar_state="collapsed",
     )
     st.markdown(_PAGE_CSS, unsafe_allow_html=True)
 
-    mark = base64.b64encode((ROOT / "assets" / "logo.png").read_bytes()).decode("ascii")
+    mark = base64.b64encode(logo).decode("ascii")
     st.markdown(
         f"""
         <div class="brand">
